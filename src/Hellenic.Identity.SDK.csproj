@@ -1,0 +1,41 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    
+    <!-- Package metadata for NuGet publishing -->
+    <PackageId>Hellenic.Identity.SDK</PackageId>
+    <Version>1.0.7</Version>
+    <Authors>Gerasimos Maropoulos</Authors>
+    <Description>Hellenic Identity SDK for JWT authentication and user management with EdDSA/Ed25519 support, ASP.NET Core authentication handler, and generic user model structure</Description>
+    <PackageTags>jwt;authentication;identity;sdk;generic;hellenic;eddsa;ed25519;aspnetcore;bearer</PackageTags>
+    <RepositoryUrl>https://github.com/kataras/hellenic-identity-sdk-csharp</RepositoryUrl>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="../README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Core dependencies -->
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="9.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Options" Version="9.0.0" />
+    <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.2.1" />
+    <PackageReference Include="Microsoft.IdentityModel.Tokens" Version="8.2.1" />
+    <PackageReference Include="System.Text.Json" Version="9.0.0" />
+    <PackageReference Include="System.Net.Http.Json" Version="9.0.0" />
+    <PackageReference Include="System.Security.Cryptography.Algorithms" Version="4.3.1" />
+    <PackageReference Include="BouncyCastle.Cryptography" Version="2.4.0" />
+    
+    <!-- ASP.NET Core Authentication dependencies -->
+    <PackageReference Include="Microsoft.AspNetCore.Authentication" Version="2.2.0" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="9.0.0" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="9.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Http" Version="9.0.0" />
+  </ItemGroup>
+
+</Project>
