@@ -64,7 +64,7 @@ dotnet add package Hellenic.Identity.SDK
 
 **PackageReference**
 ```xml
-<PackageReference Include="Hellenic.Identity.SDK" Version="1.0.8" />
+<PackageReference Include="Hellenic.Identity.SDK" Version="1.0.9" />
 ```
 
 ## Quick Start
