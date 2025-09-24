@@ -499,6 +499,98 @@ public class IdentityClient<TUser> : IIdentityClient<TUser> where TUser : class
         }
     }
 
+    public async Task<TokenResponse> RefreshTokenAsync(string refreshToken)
+    {
+        if (!IsInitialized)
+        {
+            throw new InvalidOperationException("Client not initialized");
+        }
+        
+        try
+        {
+            var request = new { refresh_token = refreshToken };
+            _logger.LogDebug("Admin refresh token request body: {RequestBody}",
+                JsonSerializer.Serialize(request));
+            
+            _httpClient.DefaultRequestHeaders.Clear();
+            _httpClient.DefaultRequestHeaders.Add("X-Token", _settings.ClientToken);
+            
+            var response = await _httpClient.PostAsJsonAsync("/u/refresh", request);
+            
+            if (response.IsSuccessStatusCode)
+            {
+                var json = await response.Content.ReadAsStringAsync();
+                var tokenResponse = JsonSerializer.Deserialize<TokenResponse>(json);
+                return tokenResponse ?? throw new InvalidOperationException("Failed to deserialize token response");
+            }
+            
+            // Read and log the error response body for better debugging
+            var errorContent = await response.Content.ReadAsStringAsync();
+            _logger.LogError("Admin refresh token failed: {StatusCode} - Response: {ErrorContent}",
+                response.StatusCode, errorContent);
+            throw new InvalidOperationException($"Admin refresh token failed with status {response.StatusCode}: {errorContent}");
+        }
+        catch (Exception ex) when (!(ex is InvalidOperationException))
+        {
+            _logger.LogError(ex, "Admin refresh token failed");
+            throw new InvalidOperationException("Admin refresh token failed", ex);
+        }
+    }
+
+/*
+    public async Task<TokenResponse> UserRefreshTokenAsync(string refreshToken)
+    {
+        try
+        {
+            // Use OAuth2 refresh_token grant flow (like Go SDK)
+            var parameters = new Dictionary<string, string>
+            {
+                ["grant_type"] = "refresh_token",
+                ["refresh_token"] = refreshToken
+            };
+            
+            // Add required OAuth2 client credentials
+            if (!string.IsNullOrEmpty(_settings.ClientID))
+            {
+                parameters["client_id"] = _settings.ClientID;
+            }
+            
+            if (!string.IsNullOrEmpty(_settings.ClientSecret))
+            {
+                parameters["client_secret"] = _settings.ClientSecret;
+            }
+            
+            if (!string.IsNullOrEmpty(_settings.DefaultScope))
+            {
+                parameters["scope"] = _settings.DefaultScope;
+            }
+            
+            _logger.LogDebug("User refresh token request parameters: {Parameters}",
+                string.Join(", ", parameters.Select(kvp => $"{kvp.Key}={kvp.Value}")));
+            
+            var content = new FormUrlEncodedContent(parameters);
+            var response = await _httpClient.PostAsync("/oauth2/token", content);
+            
+            if (response.IsSuccessStatusCode)
+            {
+                var json = await response.Content.ReadAsStringAsync();
+                var tokenResponse = JsonSerializer.Deserialize<TokenResponse>(json);
+                return tokenResponse ?? throw new InvalidOperationException("Failed to deserialize token response");
+            }
+            
+            // Read and log the error response body for better debugging
+            var errorContent = await response.Content.ReadAsStringAsync();
+            _logger.LogError("User refresh token failed: {StatusCode} - Response: {ErrorContent}",
+                response.StatusCode, errorContent);
+            throw new InvalidOperationException($"User refresh token failed with status {response.StatusCode}: {errorContent}");
+        }
+        catch (Exception ex) when (!(ex is InvalidOperationException))
+        {
+            _logger.LogError(ex, "User refresh token failed");
+            throw new InvalidOperationException("User refresh token failed", ex);
+        }
+    }
+*/
     public string EncryptPassword(string plainPassword)
     {
         if (_encryptionKeyBytes == null)

@@ -290,6 +290,18 @@ public class TokenService
         return await _identityClient.VerifyTokenAsync(token);
     }
     
+    // Refresh access token using refresh token (user operation)
+    public async Task<TokenResponse> RefreshUserTokenAsync(string refreshToken)
+    {
+        return await _identityClient.UserRefreshTokenAsync(refreshToken);
+    }
+    
+    // Admin refresh token operation
+    public async Task<TokenResponse> RefreshTokenAsync(string refreshToken)
+    {
+        return await _identityClient.RefreshTokenAsync(refreshToken);
+    }
+    
     // Refresh JWKS keys from server
     public async Task RefreshKeysAsync()
     {
@@ -977,6 +989,20 @@ public interface IIdentityClient<TUser> where TUser : class
     /// <param name="identifier">User ID or username</param>
     /// <returns>Token response if successful</returns>
     Task<TokenResponse> AdminUserSigninAsync(string identifier);
+
+    /// <summary>
+    /// Admin operation: Refresh an access token using a refresh token (requires admin client token)
+    /// </summary>
+    /// <param name="refreshToken">The refresh token to exchange for new access token</param>
+    /// <returns>Token response with new access token</returns>
+    Task<TokenResponse> RefreshTokenAsync(string refreshToken);
+
+    /// <summary>
+    /// User operation: Refresh an access token using OAuth2 refresh token grant
+    /// </summary>
+    /// <param name="refreshToken">The refresh token to exchange for new access token</param>
+    /// <returns>Token response with new access token</returns>
+    Task<TokenResponse> UserRefreshTokenAsync(string refreshToken);
 
     /// <summary>
     /// Encrypt a plain text password using AES-GCM

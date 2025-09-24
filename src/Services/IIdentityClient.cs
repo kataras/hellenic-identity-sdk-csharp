@@ -104,6 +104,23 @@ public interface IIdentityClient<TUser> where TUser : class
     Task<TokenResponse> AdminUserSigninAsync(string identifier);
 
     /// <summary>
+    /// Admin operation: Refresh an access token using a refresh token (requires admin client token)
+    /// </summary>
+    /// <param name="refreshToken">The refresh token to exchange for new access token</param>
+    /// <returns>Token response with new access token</returns>
+    /// <exception cref="InvalidOperationException">Thrown when client is not initialized or operation fails</exception>
+    Task<TokenResponse> RefreshTokenAsync(string refreshToken);
+
+/*
+    /// <summary>
+    /// User operation: Refresh an access token using OAuth2 refresh token grant
+    /// </summary>
+    /// <param name="refreshToken">The refresh token to exchange for new access token</param>
+    /// <returns>Token response with new access token</returns>
+    /// <exception cref="InvalidOperationException">Thrown when refresh operation fails</exception>
+    Task<TokenResponse> UserRefreshTokenAsync(string refreshToken);
+*/
+    /// <summary>
     /// Encrypt a plain text password using AES-GCM
     /// </summary>
     /// <param name="plainPassword">Plain text password</param>
