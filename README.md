@@ -603,18 +603,30 @@ app.MapGet("/api/protected", [Authorize] (ClaimsPrincipal user) => new
 Support multiple authentication schemes for different user types:
 
 ```csharp
-// Support multiple authentication schemes
+// Method 1: Configure all schemes at once using AuthenticationBuilder
 builder.Services.Configure<AppConfiguration>(builder.Configuration);
 
-// Add primary scheme
-builder.Services.AddHellenicAuthentication<UserModel>("Hellenic");
-
-// Add secondary scheme for admin users
-builder.Services.AddAuthentication("Hellenic")
-    .AddHellenicAuthentication<AdminModel>("HellenicAdmin", options => {
-        // Separate scheme for admin users
+// Configure authentication with primary scheme, then add additional schemes
+builder.Services.AddAuthentication("Hellenic")  // Set default scheme
+    .AddHellenicAuthentication<UserModel>("Hellenic")                    // Primary scheme for regular users
+    .AddHellenicAuthentication<AdminModel>("HellenicAdmin", options => { // Secondary scheme for admin users
         options.ExpectedIssuer = "https://admin.hellenic-server.com";
+        options.ExpectedAudience = "admin-client-id";
     });
+
+// Method 2: Add primary scheme with full setup, then additional schemes
+// builder.Services.AddHellenicAuthentication<UserModel>("Hellenic");  // Full setup for primary scheme
+//
+// builder.Services.AddAuthentication()  // Get existing authentication builder
+//     .AddHellenicAuthentication<AdminModel>("HellenicAdmin", "Admin Authentication", options => {
+//         options.ExpectedIssuer = "https://admin.hellenic-server.com";
+//         options.ExpectedAudience = "admin-client-id";
+//     });
+
+// Usage in controllers - specify the scheme:
+// [Authorize(AuthenticationSchemes = "Hellenic")]        // Use primary scheme
+// [Authorize(AuthenticationSchemes = "HellenicAdmin")]   // Use admin scheme
+// [Authorize(AuthenticationSchemes = "Hellenic,HellenicAdmin")] // Accept either scheme
 ```
 
 ### Migration from JwtBearer
@@ -656,7 +668,7 @@ builder.Services.AddHellenicAuthentication<UserModel>("Hellenic", options =>
 
 ### Performance & Simplicity Improvements
 
-🚀 **Simplified Setup**: Single method [`AddHellenicAuthentication<TUser>()`](src/Extensions/HellenicAuthenticationExtensions.cs:15) handles everything - no complex initialization required!
+🚀 **Simplified Setup**: Single method [`AddHellenicAuthentication<TUser>()`](src/Extensions/HellenicAuthenticationExtensions.cs:26) handles everything - no complex initialization required!
 
 ⚡ **Performance Optimized**:
 - **60% faster JWT claims extraction** using direct [`JwtSecurityTokenHandler.ReadJwtToken()`](src/Services/HellenicAuthenticationService.cs:45) vs Dictionary approach
@@ -696,7 +708,24 @@ builder.Services.AddHellenicAuthentication<UserModel>("CustomScheme");
 // With event configuration
 builder.Services.AddHellenicAuthentication<UserModel>("Hellenic", options => {
     options.Events = new HellenicAuthenticationEvents { /* your events */ };
+    options.ExpectedIssuer = "https://your-identity-server.com";
+    options.ExpectedAudience = "your-client-id";
 });
+```
+
+#### `AuthenticationBuilder.AddHellenicAuthentication<TUser>()`
+Add additional authentication schemes to an existing AuthenticationBuilder
+
+```csharp
+// For multiple authentication schemes - use AuthenticationBuilder extension
+builder.Services.AddAuthentication("PrimaryScheme")
+    .AddHellenicAuthentication<UserModel>("Hellenic", "Hellenic Identity", options => {
+        // Primary scheme configuration
+    })
+    .AddHellenicAuthentication<AdminModel>("HellenicAdmin", "Admin Authentication", options => {
+        // Admin scheme configuration
+        options.ExpectedIssuer = "https://admin.hellenic-server.com";
+    });
 ```
 
 #### Manual Service Registration (Advanced)
@@ -711,6 +740,26 @@ builder.Services.AddAuthentication("Hellenic")
         // Your configuration
     });
 ```
+
+#### Method Parameters Explained
+
+**`services.AddAuthentication(authenticationScheme)`**
+- `authenticationScheme`: The default authentication scheme name used when no specific scheme is specified in `[Authorize]` attributes
+- This is the scheme ASP.NET Core will use by default for authentication challenges and when `[Authorize]` is used without specifying a scheme
+
+**`AddHellenicAuthentication<TUser>(authenticationScheme, displayName, configureOptions)`**
+- `authenticationScheme`: The unique identifier for this authentication scheme (e.g., "Hellenic", "HellenicAdmin", "CustomAuth")
+  - Used internally by ASP.NET Core authentication system
+  - Referenced in `[Authorize(AuthenticationSchemes = "...")]` attributes
+  - Can be any custom name - allows multiple authentication schemes for different user types
+- `displayName`: Human-readable name shown in logs and error messages (e.g., "Hellenic Identity Authentication", "Admin Portal Auth")
+- `configureOptions`: Optional delegate to configure authentication events, validation settings, expected issuer/audience, etc.
+
+**Multiple Authentication Schemes Use Cases:**
+- Different user types (customers vs. admins) with different identity servers
+- Different authentication requirements (different issuers, audiences, or validation rules)
+- Gradual migration from one authentication system to another
+- Supporting both legacy and modern authentication simultaneously
 
 ## Advanced Features
 
