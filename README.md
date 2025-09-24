@@ -64,7 +64,7 @@ dotnet add package Hellenic.Identity.SDK
 
 **PackageReference**
 ```xml
-<PackageReference Include="Hellenic.Identity.SDK" Version="1.0.9" />
+<PackageReference Include="Hellenic.Identity.SDK" Version="1.0.10" />
 ```
 
 ## Quick Start
@@ -289,14 +289,9 @@ public class TokenService
     {
         return await _identityClient.VerifyTokenAsync(token);
     }
+
     
-    // Refresh access token using refresh token (user operation)
-    public async Task<TokenResponse> RefreshUserTokenAsync(string refreshToken)
-    {
-        return await _identityClient.UserRefreshTokenAsync(refreshToken);
-    }
-    
-    // Admin refresh token operation
+    // refresh token operation
     public async Task<TokenResponse> RefreshTokenAsync(string refreshToken)
     {
         return await _identityClient.RefreshTokenAsync(refreshToken);
