@@ -71,7 +71,7 @@ public class IdentityClient<TUser> : IIdentityClient<TUser> where TUser : class
             // Verify client token is provided (required for initialization)
             if (string.IsNullOrEmpty(_settings.ClientToken))
             {
-                _logger.LogError("Client token is required for client initialization");
+                _logger.LogDebug("ERR: Client token is required for client initialization");
                 throw new InvalidOperationException("Client token is required for client initialization");
             }
             
@@ -84,7 +84,7 @@ public class IdentityClient<TUser> : IIdentityClient<TUser> where TUser : class
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to initialize Identity Client");
+            _logger.LogDebug(ex, "ERR: Failed to initialize Identity Client");
             return false;
         }
     }
@@ -98,7 +98,7 @@ public class IdentityClient<TUser> : IIdentityClient<TUser> where TUser : class
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to load keys from JWKS endpoint");
+            _logger.LogDebug(ex, "ERR: Failed to load keys from JWKS endpoint");
             throw;
         }
     }
@@ -136,7 +136,7 @@ public class IdentityClient<TUser> : IIdentityClient<TUser> where TUser : class
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to get signing keys from JWKS endpoint");
+            _logger.LogDebug(ex, "ERR: Failed to get signing keys from JWKS endpoint");
             throw;
         }
     }
@@ -151,7 +151,7 @@ public class IdentityClient<TUser> : IIdentityClient<TUser> where TUser : class
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Synchronous initialization failed");
+            _logger.LogDebug(ex, "ERR: Synchronous initialization failed");
             return false;
         }
     }
@@ -166,7 +166,7 @@ public class IdentityClient<TUser> : IIdentityClient<TUser> where TUser : class
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Synchronous key loading failed");
+            _logger.LogDebug(ex, "ERR: Synchronous key loading failed");
             throw;
         }
     }
@@ -181,7 +181,7 @@ public class IdentityClient<TUser> : IIdentityClient<TUser> where TUser : class
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Synchronous get signing keys failed");
+            _logger.LogDebug(ex, "ERR: Synchronous get signing keys failed");
             throw;
         }
     }
@@ -344,7 +344,7 @@ public class IdentityClient<TUser> : IIdentityClient<TUser> where TUser : class
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Token introspection failed");
+            _logger.LogDebug(ex, "ERR: Token introspection failed");
             return null;
         }
     }
@@ -394,13 +394,13 @@ public class IdentityClient<TUser> : IIdentityClient<TUser> where TUser : class
             
             // Read and log the error response body for better debugging
             var errorContent = await response.Content.ReadAsStringAsync();
-            _logger.LogError("Admin signup failed: {StatusCode} - Response: {ErrorContent}",
+            _logger.LogDebug("ERR: Admin signup failed: {StatusCode} - Response: {ErrorContent}",
                 response.StatusCode, errorContent);
             throw new InvalidOperationException($"Admin signup failed with status {response.StatusCode}: {errorContent}");
         }
         catch (Exception ex) when (!(ex is InvalidOperationException || ex is ArgumentException))
         {
-            _logger.LogError(ex, "Admin user signup failed");
+            _logger.LogDebug(ex, "ERR: Admin user signup failed");
             throw new InvalidOperationException("Admin user signup failed", ex);
         }
     }
@@ -450,13 +450,13 @@ public class IdentityClient<TUser> : IIdentityClient<TUser> where TUser : class
             
             // Read and log the error response body for better debugging
             var errorContent = await response.Content.ReadAsStringAsync();
-            _logger.LogError("User signin failed: {StatusCode} - Response: {ErrorContent}",
+            _logger.LogDebug("ERR: User signin failed: {StatusCode} - Response: {ErrorContent}",
                 response.StatusCode, errorContent);
             throw new InvalidOperationException($"User signin failed with status {response.StatusCode}: {errorContent}");
         }
         catch (Exception ex) when (!(ex is InvalidOperationException))
         {
-            _logger.LogError(ex, "User signin failed");
+            _logger.LogDebug(ex, "ERR: User signin failed");
             throw new InvalidOperationException("User signin failed", ex);
         }
     }
@@ -488,13 +488,13 @@ public class IdentityClient<TUser> : IIdentityClient<TUser> where TUser : class
             
             // Read and log the error response body for better debugging
             var errorContent = await response.Content.ReadAsStringAsync();
-            _logger.LogError("Admin user signin failed: {StatusCode} - Response: {ErrorContent}",
+            _logger.LogDebug("ERR: Admin user signin failed: {StatusCode} - Response: {ErrorContent}",
                 response.StatusCode, errorContent);
             throw new InvalidOperationException($"Admin user signin failed with status {response.StatusCode}: {errorContent}");
         }
         catch (Exception ex) when (!(ex is InvalidOperationException))
         {
-            _logger.LogError(ex, "Admin user signin failed");
+            _logger.LogDebug(ex, "ERR: Admin user signin failed");
             throw new InvalidOperationException("Admin user signin failed", ex);
         }
     }
@@ -526,14 +526,62 @@ public class IdentityClient<TUser> : IIdentityClient<TUser> where TUser : class
             
             // Read and log the error response body for better debugging
             var errorContent = await response.Content.ReadAsStringAsync();
-            _logger.LogError("Admin refresh token failed: {StatusCode} - Response: {ErrorContent}",
+            _logger.LogDebug("ERR: Admin refresh token failed: {StatusCode} - Response: {ErrorContent}",
                 response.StatusCode, errorContent);
             throw new InvalidOperationException($"Admin refresh token failed with status {response.StatusCode}: {errorContent}");
         }
         catch (Exception ex) when (!(ex is InvalidOperationException))
         {
-            _logger.LogError(ex, "Admin refresh token failed");
+            _logger.LogDebug(ex, "ERR: Admin refresh token failed");
             throw new InvalidOperationException("Admin refresh token failed", ex);
+        }
+    }
+
+    public async Task<TokenResponse> AdminEnrichTokenAsync(string accessToken, object extraClaims)
+    {
+        if (!IsInitialized)
+        {
+            throw new InvalidOperationException("Client not initialized");
+        }
+        
+        try
+        {
+            _logger.LogDebug("Starting admin enrich token operation");
+
+            // Create request body with the expected structure
+            var requestBody = new
+            {
+                access_token = accessToken,
+                extra_claims = extraClaims
+            };
+
+            var requestJson = JsonSerializer.Serialize(requestBody);
+            _logger.LogDebug("Admin enrich token request body: {RequestBody}", requestJson);
+            
+            _httpClient.DefaultRequestHeaders.Clear();
+            _httpClient.DefaultRequestHeaders.Add("X-Token", _settings.ClientToken);
+            
+            var response = await _httpClient.PostAsync("/u/enrich",
+                new StringContent(requestJson, Encoding.UTF8, "application/json"));
+            
+            if (response.IsSuccessStatusCode)
+            {
+                var json = await response.Content.ReadAsStringAsync();
+                var tokenResponse = JsonSerializer.Deserialize<TokenResponse>(json);
+                _logger.LogDebug("Admin enrich token operation completed successfully");
+                return tokenResponse ?? throw new InvalidOperationException("Failed to deserialize token response");
+            }
+            
+            // Read and log the error response body for better debugging
+            var errorContent = await response.Content.ReadAsStringAsync();
+            _logger.LogDebug("ERR: Admin enrich token failed: {StatusCode} - Response: {ErrorContent}",
+                response.StatusCode, errorContent);
+            throw new InvalidOperationException($"Admin enrich token failed with status {response.StatusCode}: {errorContent}");
+        }
+        catch (Exception ex) when (!(ex is InvalidOperationException))
+        {
+            _logger.LogDebug(ex, "ERR: Admin enrich token failed");
+            throw new InvalidOperationException("Admin enrich token failed", ex);
         }
     }
 
@@ -580,13 +628,13 @@ public class IdentityClient<TUser> : IIdentityClient<TUser> where TUser : class
             
             // Read and log the error response body for better debugging
             var errorContent = await response.Content.ReadAsStringAsync();
-            _logger.LogError("User refresh token failed: {StatusCode} - Response: {ErrorContent}",
+            _logger.LogDebug("ERR: User refresh token failed: {StatusCode} - Response: {ErrorContent}",
                 response.StatusCode, errorContent);
             throw new InvalidOperationException($"User refresh token failed with status {response.StatusCode}: {errorContent}");
         }
         catch (Exception ex) when (!(ex is InvalidOperationException))
         {
-            _logger.LogError(ex, "User refresh token failed");
+            _logger.LogDebug(ex, "ERR: User refresh token failed");
             throw new InvalidOperationException("User refresh token failed", ex);
         }
     }
@@ -621,7 +669,7 @@ public class IdentityClient<TUser> : IIdentityClient<TUser> where TUser : class
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Password encryption failed");
+            _logger.LogDebug(ex, "ERR: Password encryption failed");
             throw new InvalidOperationException("Failed to encrypt password", ex);
         }
     }
@@ -654,7 +702,7 @@ public class IdentityClient<TUser> : IIdentityClient<TUser> where TUser : class
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Password decryption failed");
+            _logger.LogDebug(ex, "ERR: Password decryption failed");
             throw new InvalidOperationException("Failed to decrypt password", ex);
         }
     }
@@ -684,13 +732,13 @@ public class IdentityClient<TUser> : IIdentityClient<TUser> where TUser : class
             
             // Read and log the error response body for better debugging
             var errorContent = await response.Content.ReadAsStringAsync();
-            _logger.LogError("Get user schema failed: {StatusCode} - Response: {ErrorContent}",
+            _logger.LogDebug("ERR: Get user schema failed: {StatusCode} - Response: {ErrorContent}",
                 response.StatusCode, errorContent);
             throw new InvalidOperationException($"Get user schema failed with status {response.StatusCode}: {errorContent}");
         }
         catch (Exception ex) when (!(ex is InvalidOperationException))
         {
-            _logger.LogError(ex, "Get user schema failed");
+            _logger.LogDebug(ex, "ERR: Get user schema failed");
             throw new InvalidOperationException("Get user schema failed", ex);
         }
     }
@@ -734,7 +782,7 @@ public class IdentityClient<TUser> : IIdentityClient<TUser> where TUser : class
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Admin delete user failed");
+            _logger.LogDebug(ex, "ERR: Admin delete user failed");
             return false;
         }
     }
@@ -773,7 +821,7 @@ public class IdentityClient<TUser> : IIdentityClient<TUser> where TUser : class
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Admin restore user failed");
+            _logger.LogDebug(ex, "ERR: Admin restore user failed");
             return false;
         }
     }
@@ -822,7 +870,7 @@ public class IdentityClient<TUser> : IIdentityClient<TUser> where TUser : class
             
             if (tokenResponseObj?.Token == null)
             {
-                _logger.LogError("Password reset token is null");
+                _logger.LogDebug("ERR: Password reset token is null");
                 return false;
             }
             
@@ -853,7 +901,7 @@ public class IdentityClient<TUser> : IIdentityClient<TUser> where TUser : class
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Admin reset user password failed");
+            _logger.LogDebug(ex, "ERR: Admin reset user password failed");
             return false;
         }
     }
@@ -903,13 +951,13 @@ public class IdentityClient<TUser> : IIdentityClient<TUser> where TUser : class
             
             // Read and log the error response body for better debugging
             var errorContent = await response.Content.ReadAsStringAsync();
-            _logger.LogError("List users failed: {StatusCode} - Response: {ErrorContent}",
+            _logger.LogDebug("ERR: List users failed: {StatusCode} - Response: {ErrorContent}",
                 response.StatusCode, errorContent);
             throw new InvalidOperationException($"List users failed with status {response.StatusCode}: {errorContent}");
         }
         catch (Exception ex) when (!(ex is InvalidOperationException))
         {
-            _logger.LogError(ex, "Admin list users failed");
+            _logger.LogDebug(ex, "ERR: Admin list users failed");
             throw new InvalidOperationException("Admin list users failed", ex);
         }
     }
@@ -950,13 +998,13 @@ public class IdentityClient<TUser> : IIdentityClient<TUser> where TUser : class
             
             // Read and log the error response body for better debugging
             var errorContent = await response.Content.ReadAsStringAsync();
-            _logger.LogError("Update users failed: {StatusCode} - Response: {ErrorContent}",
+            _logger.LogDebug("ERR: Update users failed: {StatusCode} - Response: {ErrorContent}",
                 response.StatusCode, errorContent);
             throw new InvalidOperationException($"Update users failed with status {response.StatusCode}: {errorContent}");
         }
         catch (Exception ex) when (!(ex is InvalidOperationException))
         {
-            _logger.LogError(ex, "Admin update users failed");
+            _logger.LogDebug(ex, "ERR: Admin update users failed");
             throw new InvalidOperationException("Admin update users failed", ex);
         }
     }

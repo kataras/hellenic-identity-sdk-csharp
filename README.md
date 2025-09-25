@@ -64,7 +64,7 @@ dotnet add package Hellenic.Identity.SDK
 
 **PackageReference**
 ```xml
-<PackageReference Include="Hellenic.Identity.SDK" Version="1.0.10" />
+<PackageReference Include="Hellenic.Identity.SDK" Version="1.0.11" />
 ```
 
 ## Quick Start
@@ -295,6 +295,21 @@ public class TokenService
     public async Task<TokenResponse> RefreshTokenAsync(string refreshToken)
     {
         return await _identityClient.RefreshTokenAsync(refreshToken);
+    }
+    
+    // Admin enrich token operation
+    public async Task<TokenResponse> AdminEnrichTokenAsync(string accessToken)
+    {
+        // Enrich token with additional claims/data
+        var extraClaims = new
+        {
+            custom_claim = "enriched_value",
+            permissions = new[] { "read:users", "write:users" },
+            department = "engineering",
+            enriched_at = DateTimeOffset.UtcNow.ToString()
+        };
+        
+        return await _identityClient.AdminEnrichTokenAsync(accessToken, extraClaims);
     }
     
     // Refresh JWKS keys from server

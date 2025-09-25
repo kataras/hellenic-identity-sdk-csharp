@@ -111,6 +111,15 @@ public interface IIdentityClient<TUser> where TUser : class
     /// <exception cref="InvalidOperationException">Thrown when client is not initialized or operation fails</exception>
     Task<TokenResponse> RefreshTokenAsync(string refreshToken);
 
+    /// <summary>
+    /// Admin operation: Enrich an existing access token with additional temporary data/claims (requires admin client token)
+    /// </summary>
+    /// <param name="accessToken">The existing access token to enrich</param>
+    /// <param name="extraClaims">Additional claims/data to add to the token (e.g., extra roles, permissions, custom claims)</param>
+    /// <returns>Token response with new enriched access token</returns>
+    /// <exception cref="InvalidOperationException">Thrown when client is not initialized or operation fails</exception>
+    Task<TokenResponse> AdminEnrichTokenAsync(string accessToken, object extraClaims);
+
 /*
     /// <summary>
     /// User operation: Refresh an access token using OAuth2 refresh token grant
