@@ -1,8 +1,10 @@
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Http;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Hellenic.Identity.SDK.Authentication;
 using Hellenic.Identity.SDK.Models;
@@ -23,6 +25,7 @@ public static class HellenicAuthenticationExtensions
     /// <summary>
     /// Adds complete Hellenic Authentication with EdDSA support using the default scheme name "Hellenic".
     /// This method registers everything needed: IdentityClient, AuthenticationService, Handler, and initializes JWKS keys.
+    /// Reads configuration from any registered IConfiguration provider (appsettings.json, environment variables, user secrets, Azure Key Vault, etc.)
     /// </summary>
     /// <typeparam name="TUser">The user model type that represents your application's user structure</typeparam>
     /// <param name="services">The service collection to add services to</param>
@@ -39,6 +42,7 @@ public static class HellenicAuthenticationExtensions
     /// <summary>
     /// Adds complete Hellenic Authentication with EdDSA support using a custom authentication scheme name.
     /// This method registers everything needed: IdentityClient, AuthenticationService, Handler, and initializes JWKS keys.
+    /// Reads configuration from any registered IConfiguration provider (appsettings.json, environment variables, user secrets, Azure Key Vault, etc.)
     /// </summary>
     /// <typeparam name="TUser">The user model type that represents your application's user structure</typeparam>
     /// <param name="services">The service collection to add services to</param>
@@ -61,16 +65,26 @@ public static class HellenicAuthenticationExtensions
             var httpClientFactory = serviceProvider.GetRequiredService<IHttpClientFactory>();
             var httpClient = httpClientFactory.CreateClient(typeof(IdentityClient<TUser>).Name);
             
-            var configuration = serviceProvider.GetRequiredService<IOptions<AppConfiguration>>();
+            // Use IConfiguration directly - works with any configuration provider
+            var configuration = serviceProvider.GetRequiredService<IConfiguration>();
             var logger = serviceProvider.GetRequiredService<ILogger<IdentityClient<TUser>>>();
             
-            var identityClient = new IdentityClient<TUser>(configuration, logger, httpClient);
+            // Bind configuration to IdentityClientOptions
+            var identityClientOptions = new IdentityClientOptions();
+            configuration.GetSection("IdentityClient").Bind(identityClientOptions);
+            
+            // Create AppConfiguration and wrap in IOptions
+            var appConfiguration = new AppConfiguration { IdentityClient = identityClientOptions };
+            var options = Microsoft.Extensions.Options.Options.Create(appConfiguration);
+            
+            var identityClient = new IdentityClient<TUser>(options, logger, httpClient);
             
             // Initialize synchronously during registration
             var success = identityClient.Initialize();
             if (!success)
             {
-                throw new InvalidOperationException("Failed to initialize Hellenic Identity Client - JWKS keys could not be loaded");
+                throw new InvalidOperationException("Failed to initialize Hellenic Identity Client - JWKS keys could not be loaded. " +
+                    "Please verify your BaseURL, ClientToken, and network connectivity.");
             }
             
             return identityClient;
@@ -133,5 +147,33 @@ public static class HellenicAuthenticationExtensions
             authenticationScheme,    // Scheme name - used internally by ASP.NET Core and in [Authorize(AuthenticationSchemes = "...")]
             displayName,            // Display name - shown in logs and error messages (customizable)
             configureOptions);      // Configuration delegate for setting up events, validation options, etc.
+    }
+
+    /// <summary>
+    /// Gets the registered Hellenic Identity Client from the service provider.
+    /// This is a helper method to retrieve the IIdentityClient&lt;TUser&gt; instance that was registered during authentication setup.
+    /// </summary>
+    /// <typeparam name="TUser">The user model type that was used during authentication registration</typeparam>
+    /// <param name="serviceProvider">The service provider to retrieve the client from</param>
+    /// <returns>The registered Hellenic Identity Client instance</returns>
+    /// <exception cref="InvalidOperationException">Thrown when the IdentityClient is not registered or TUser type mismatch</exception>
+    public static IIdentityClient<TUser> GetHellenicIdentityClient<TUser>(this IServiceProvider serviceProvider)
+        where TUser : class
+    {
+        return serviceProvider.GetRequiredService<IIdentityClient<TUser>>();
+    }
+
+    /// <summary>
+    /// Gets the registered Hellenic Identity Client from the HTTP context.
+    /// This is a helper method to retrieve the IIdentityClient&lt;TUser&gt; instance from within controllers or middleware.
+    /// </summary>
+    /// <typeparam name="TUser">The user model type that was used during authentication registration</typeparam>
+    /// <param name="httpContext">The HTTP context to retrieve the client from</param>
+    /// <returns>The registered Hellenic Identity Client instance</returns>
+    /// <exception cref="InvalidOperationException">Thrown when the IdentityClient is not registered or TUser type mismatch</exception>
+    public static IIdentityClient<TUser> GetHellenicIdentityClient<TUser>(this HttpContext httpContext)
+        where TUser : class
+    {
+        return httpContext.RequestServices.GetRequiredService<IIdentityClient<TUser>>();
     }
 }

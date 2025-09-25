@@ -444,14 +444,16 @@ dotnet add package Hellenic.Identity.SDK
 ```
 
 #### 2. Simple Configuration
+
+The SDK uses ASP.NET Core's `IConfiguration` system, which automatically supports multiple configuration sources without requiring the IOptions pattern:
+
 ```csharp
 using Hellenic.Identity.SDK.Extensions;
 using Hellenic.Identity.SDK.Models;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Configure Hellenic Authentication - ONE LINE SETUP!
-builder.Services.Configure<AppConfiguration>(builder.Configuration);
+// ONE LINE SETUP - automatically reads from any IConfiguration source
 builder.Services.AddHellenicAuthentication<UserModel>();
 
 builder.Services.AddAuthorization();
@@ -460,6 +462,53 @@ var app = builder.Build();
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
+```
+
+**Configuration Sources Supported:**
+- **appsettings.json** (development)
+- **Environment Variables** (production)
+- **User Secrets** (development)
+- **Azure Key Vault** (production)
+- **AWS Secrets Manager** (production)
+- **Command Line Arguments**
+- **Any custom IConfiguration provider**
+
+**Development Example** (appsettings.json):
+```json
+{
+  "IdentityClient": {
+    "BaseURL": "https://your-identity-server.com",
+    "ClientToken": "your-jwt-client-token",
+    "ClientID": "your-oauth-client-id",
+    "ClientSecret": "your-oauth-client-secret",
+    "EncryptionKey": "your-32-character-hex-encryption-key",
+    "PasswordStrengthLevel": "medium",
+    "DefaultScope": "user:read"
+  }
+}
+```
+
+**Production Example** (Environment Variables):
+```bash
+# Set these environment variables in your production environment
+export IdentityClient__BaseURL="https://your-identity-server.com"
+export IdentityClient__ClientToken="your-jwt-client-token"
+export IdentityClient__ClientID="your-oauth-client-id"
+export IdentityClient__ClientSecret="your-oauth-client-secret"
+export IdentityClient__EncryptionKey="your-32-character-hex-encryption-key"
+export IdentityClient__PasswordStrengthLevel="medium"
+export IdentityClient__DefaultScope="user:read"
+```
+
+**Azure Key Vault Example**:
+```csharp
+var builder = WebApplication.CreateBuilder(args);
+
+// Add Azure Key Vault to configuration
+builder.Configuration.AddAzureKeyVault(/* your Key Vault configuration */);
+
+// Hellenic Authentication automatically reads from any IConfiguration source
+builder.Services.AddHellenicAuthentication<UserModel>();
 ```
 
 #### 3. Define Your User Model
@@ -618,16 +667,114 @@ app.MapGet("/api/protected", [Authorize] (ClaimsPrincipal user) => new
     User = user.Identity?.Name,
     Claims = user.Claims.Select(c => new { c.Type, c.Value })
 });
+
+// Access the Identity Client directly if needed
+app.MapGet("/api/user-schema", [Authorize] async (HttpContext context) =>
+{
+    var identityClient = context.GetHellenicIdentityClient<UserModel>();
+    var schema = await identityClient.AdminGetUserSchemaAsync();
+    return Results.Ok(schema);
+});
 ```
+
+### Accessing the Identity Client
+
+When you need direct access to the Hellenic Identity Client for admin operations or token management, use the provided helper methods:
+
+**In Controllers:**
+```csharp
+[ApiController]
+[Route("api/admin")]
+public class AdminController : ControllerBase
+{
+    [HttpGet("users")]
+    [Authorize]
+    public async Task<IActionResult> GetUsers()
+    {
+        // Get the Identity Client directly from HttpContext
+        var identityClient = HttpContext.GetHellenicIdentityClient<UserModel>();
+        
+        var pageOptions = new PageOptions { Page = 1, Limit = 10 };
+        var users = await identityClient.AdminListUsersAsync(pageOptions);
+        
+        return Ok(users);
+    }
+    
+    [HttpPost("enrich-token")]
+    [Authorize]
+    public async Task<IActionResult> EnrichToken([FromBody] EnrichTokenRequest request)
+    {
+        var identityClient = HttpContext.GetHellenicIdentityClient<UserModel>();
+        
+        var extraClaims = new
+        {
+            department = "engineering",
+            permissions = new[] { "read:users", "write:users" }
+        };
+        
+        var enrichedToken = await identityClient.AdminEnrichTokenAsync(request.AccessToken, extraClaims);
+        return Ok(enrichedToken);
+    }
+}
+```
+
+**In Services (with Dependency Injection):**
+```csharp
+public class UserManagementService
+{
+    private readonly IIdentityClient<UserModel> _identityClient;
+    
+    public UserManagementService(IServiceProvider serviceProvider)
+    {
+        // Get the Identity Client from service provider
+        _identityClient = serviceProvider.GetHellenicIdentityClient<UserModel>();
+    }
+    
+    // Alternative: Direct injection (preferred)
+    public UserManagementService(IIdentityClient<UserModel> identityClient)
+    {
+        _identityClient = identityClient;
+    }
+    
+    public async Task<List<UserModel>> GetUsersAsync()
+    {
+        var pageOptions = new PageOptions { Page = 1, Limit = 50 };
+        var result = await _identityClient.AdminListUsersAsync(pageOptions);
+        return result?.Data ?? new List<UserModel>();
+    }
+}
+```
+
+**In Minimal APIs:**
+```csharp
+// Using helper method
+app.MapGet("/api/admin/users", [Authorize] async (HttpContext context) =>
+{
+    var identityClient = context.GetHellenicIdentityClient<UserModel>();
+    var pageOptions = new PageOptions { Page = 1, Limit = 10 };
+    var users = await identityClient.AdminListUsersAsync(pageOptions);
+    return Results.Ok(users);
+});
+
+// Using direct injection (preferred)
+app.MapGet("/api/admin/schema", [Authorize] async (IIdentityClient<UserModel> identityClient) =>
+{
+    var schema = await identityClient.AdminGetUserSchemaAsync();
+    return Results.Ok(schema);
+});
+```
+
+**Available Helper Methods:**
+- [`serviceProvider.GetHellenicIdentityClient<TUser>()`](src/Extensions/HellenicAuthenticationExtensions.cs:153) - Get client from IServiceProvider
+- [`httpContext.GetHellenicIdentityClient<TUser>()`](src/Extensions/HellenicAuthenticationExtensions.cs:163) - Get client from HttpContext
+
+These methods provide convenient access to the registered `IIdentityClient<TUser>` instance for admin operations, token management, and user operations.
 
 ### Multiple Authentication Schemes
 
-Support multiple authentication schemes for different user types:
+Support multiple authentication schemes for different user types using IConfiguration:
 
 ```csharp
-// Method 1: Configure all schemes at once using AuthenticationBuilder
-builder.Services.Configure<AppConfiguration>(builder.Configuration);
-
 // Configure authentication with primary scheme, then add additional schemes
 builder.Services.AddAuthentication("Hellenic")  // Set default scheme
     .AddHellenicAuthentication<UserModel>("Hellenic")                    // Primary scheme for regular users
@@ -635,21 +782,41 @@ builder.Services.AddAuthentication("Hellenic")  // Set default scheme
         options.ExpectedIssuer = "https://admin.hellenic-server.com";
         options.ExpectedAudience = "admin-client-id";
     });
-
-// Method 2: Add primary scheme with full setup, then additional schemes
-// builder.Services.AddHellenicAuthentication<UserModel>("Hellenic");  // Full setup for primary scheme
-//
-// builder.Services.AddAuthentication()  // Get existing authentication builder
-//     .AddHellenicAuthentication<AdminModel>("HellenicAdmin", "Admin Authentication", options => {
-//         options.ExpectedIssuer = "https://admin.hellenic-server.com";
-//         options.ExpectedAudience = "admin-client-id";
-//     });
-
-// Usage in controllers - specify the scheme:
-// [Authorize(AuthenticationSchemes = "Hellenic")]        // Use primary scheme
-// [Authorize(AuthenticationSchemes = "HellenicAdmin")]   // Use admin scheme
-// [Authorize(AuthenticationSchemes = "Hellenic,HellenicAdmin")] // Accept either scheme
 ```
+
+**Configuration Examples:**
+
+**appsettings.json** (Development):
+```json
+{
+  "IdentityClient": {
+    "BaseURL": "https://your-identity-server.com",
+    "ClientToken": "your-jwt-client-token",
+    // ... regular user settings
+  }
+}
+```
+
+**Environment Variables** (Production):
+```bash
+# Regular user configuration
+export IdentityClient__BaseURL="https://your-identity-server.com"
+export IdentityClient__ClientToken="your-jwt-client-token"
+
+# Admin configuration (if needed for different client)
+export AdminIdentityClient__BaseURL="https://admin.hellenic-server.com"
+export AdminIdentityClient__ClientToken="your-admin-jwt-client-token"
+```
+
+**Usage in Controllers:**
+```csharp
+// Specify the scheme in [Authorize] attributes:
+[Authorize(AuthenticationSchemes = "Hellenic")]        // Use primary scheme
+[Authorize(AuthenticationSchemes = "HellenicAdmin")]   // Use admin scheme
+[Authorize(AuthenticationSchemes = "Hellenic,HellenicAdmin")] // Accept either scheme
+```
+
+**Note:** For multiple schemes with different identity servers, you may need separate configuration sections or manual service registration for different `IIdentityClient<T>` instances.
 
 ### Migration from JwtBearer
 
