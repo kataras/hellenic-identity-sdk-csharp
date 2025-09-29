@@ -1079,6 +1079,131 @@ public class IdentityClient<TUser> : IIdentityClient<TUser> where TUser : class
         }
     }
 
+    /// <summary>
+    /// Admin operation: Perform partial updates on users (core fields and JSONB attrs)
+    /// Supports updating both core table fields (username, password) and JSONB attrs fields.
+    /// The password field, if present, will be automatically encrypted using the SDK's encryption key.
+    /// </summary>
+    /// <param name="updates">List of partial update specifications</param>
+    /// <returns>Count of updated users</returns>
+    /// <exception cref="InvalidOperationException">Thrown when client is not initialized or operation fails</exception>
+    /// <example>
+    /// Update user fields and nested attributes:
+    /// <code>
+    /// var updates = new List&lt;PartialUpdateSpec&gt;
+    /// {
+    ///     new PartialUpdateSpec
+    ///     {
+    ///         Id = "user-123",
+    ///         Set = new Dictionary&lt;string, object&gt;
+    ///         {
+    ///             ["username"] = "new_username@example.com",
+    ///             ["password"] = "newPlainPassword123", // Will be encrypted automatically
+    ///             ["profile.name"] = "John Doe",
+    ///             ["profile.age"] = 30,
+    ///             ["settings.theme"] = "dark"
+    ///         },
+    ///         Remove = new List&lt;string&gt;
+    ///         {
+    ///             "profile.avatar",
+    ///             "settings.notifications"
+    ///         }
+    ///     }
+    /// };
+    ///
+    /// var result = await client.AdminUpdateUsersPartialAsync(updates);
+    /// Console.WriteLine($"Updated {result.Count} users");
+    /// </code>
+    /// </example>
+    public async Task<CountResponse<long>> AdminUpdateUsersPartialAsync(List<PartialUpdateSpec> updates)
+    {
+        if (!IsInitialized)
+        {
+            throw new InvalidOperationException("Client not initialized");
+        }
+        
+        try
+        {
+            _logger.LogDebug("Performing partial updates on {UpdateCount} users", updates.Count);
+            
+            // Process updates to encrypt any password fields (mirrors Go SDK logic)
+            var processedUpdates = new List<PartialUpdateSpec>();
+            
+            for (int i = 0; i < updates.Count; i++)
+            {
+                var update = updates[i];
+                var processedUpdate = new PartialUpdateSpec
+                {
+                    Id = update.Id,
+                    Username = update.Username,
+                    Set = update.Set != null ? new Dictionary<string, object>(update.Set) : null,
+                    Remove = update.Remove != null ? new List<string>(update.Remove) : null
+                };
+                
+                // Check if password field is present and encrypt it
+                if (processedUpdate.Set?.ContainsKey("password") == true)
+                {
+                    var passwordValue = processedUpdate.Set["password"];
+                    if (passwordValue is not string plainPassword)
+                    {
+                        throw new InvalidOperationException($"Password at update index {i} must be a string");
+                    }
+                    
+                    // Validate password strength first
+                    try
+                    {
+                        ValidatePassword(plainPassword);
+                    }
+                    catch (ArgumentException ex)
+                    {
+                        throw new InvalidOperationException($"Password validation failed at update index {i}: {ex.Message}", ex);
+                    }
+                    
+                    // Encrypt the password
+                    try
+                    {
+                        var encryptedPassword = EncryptPassword(plainPassword);
+                        processedUpdate.Set["password"] = encryptedPassword;
+                        _logger.LogDebug("Password encrypted for update at index {Index}", i);
+                    }
+                    catch (Exception ex)
+                    {
+                        throw new InvalidOperationException($"Failed to encrypt password at update index {i}: {ex.Message}", ex);
+                    }
+                }
+                
+                processedUpdates.Add(processedUpdate);
+            }
+            
+            var requestJson = JsonSerializer.Serialize(processedUpdates);
+            _logger.LogDebug("Admin partial update users request body: {RequestBody}", requestJson);
+            
+            _httpClient.DefaultRequestHeaders.Clear();
+            _httpClient.DefaultRequestHeaders.Add("X-Token", _settings.ClientToken);
+            
+            var response = await _httpClient.PatchAsync("/u/attrs",
+                new StringContent(requestJson, Encoding.UTF8, "application/json"));
+            
+            if (response.IsSuccessStatusCode)
+            {
+                var json = await response.Content.ReadAsStringAsync();
+                var countResponse = JsonSerializer.Deserialize<CountResponse<long>>(json);
+                return countResponse ?? throw new InvalidOperationException("Failed to deserialize partial update users response");
+            }
+            
+            // Read and log the error response body for better debugging
+            var errorContent = await response.Content.ReadAsStringAsync();
+            _logger.LogDebug("ERR: Partial update users failed: {StatusCode} - Response: {ErrorContent}",
+                response.StatusCode, errorContent);
+            throw new InvalidOperationException($"Partial update users failed with status {response.StatusCode}: {errorContent}");
+        }
+        catch (Exception ex) when (!(ex is InvalidOperationException))
+        {
+            _logger.LogDebug(ex, "ERR: Admin partial update users failed");
+            throw new InvalidOperationException("Admin partial update users failed", ex);
+        }
+    }
+
     private List<SecurityKey> ConvertJwkSetToSecurityKeys(JwkSet? jwkSet)
     {
         var keys = new List<SecurityKey>();

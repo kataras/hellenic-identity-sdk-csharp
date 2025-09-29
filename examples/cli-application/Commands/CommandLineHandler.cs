@@ -40,6 +40,7 @@ public class CommandLineHandler
         rootCommand.AddCommand(CreateAdminResetPasswordCommand());
         rootCommand.AddCommand(CreateAdminListUsersCommand());
         rootCommand.AddCommand(CreateAdminUpdateUsersCommand());
+        rootCommand.AddCommand(CreateAdminUpdateUsersPartialCommand());
 
         return rootCommand;
     }
@@ -328,6 +329,47 @@ public class CommandLineHandler
         {
             await HandleAdminUpdateUsersAsync(file, columns);
         }, fileOption, columnsOption);
+
+        return command;
+    }
+
+    private Command CreateAdminUpdateUsersPartialCommand()
+    {
+        var command = new Command("admin-update-users-partial", "Perform partial updates on users with JSONB attrs support (requires admin client token)");
+        
+        var userIdOption = new Option<string>(
+            name: "--user-id",
+            description: "User ID to update")
+        { IsRequired = true };
+        
+        var usernameOption = new Option<string>(
+            name: "--new-username",
+            description: "New username (core field)");
+        
+        var passwordOption = new Option<string>(
+            name: "--new-password",
+            description: "New password (core field, will be encrypted)");
+        
+        var setFieldOption = new Option<string[]>(
+            name: "--set",
+            description: "Set field values in format 'field=value' (e.g., 'profile.name=John Doe')")
+        { AllowMultipleArgumentsPerToken = true };
+        
+        var removeFieldOption = new Option<string[]>(
+            name: "--remove",
+            description: "Remove field paths (e.g., 'profile.avatar', 'settings.theme')")
+        { AllowMultipleArgumentsPerToken = true };
+
+        command.AddOption(userIdOption);
+        command.AddOption(usernameOption);
+        command.AddOption(passwordOption);
+        command.AddOption(setFieldOption);
+        command.AddOption(removeFieldOption);
+
+        command.SetHandler(async (string userId, string newUsername, string newPassword, string[] setFields, string[] removeFields) =>
+        {
+            await HandleAdminUpdateUsersPartialAsync(userId, newUsername, newPassword, setFields, removeFields);
+        }, userIdOption, usernameOption, passwordOption, setFieldOption, removeFieldOption);
 
         return command;
     }
@@ -841,6 +883,111 @@ public class CommandLineHandler
         {
             Console.WriteLine($"❌ Error updating users: {ex.Message}");
             _logger.LogError(ex, "Update users command failed");
+        }
+    }
+
+    private async Task HandleAdminUpdateUsersPartialAsync(string userId, string newUsername, string newPassword, string[] setFields, string[] removeFields)
+    {
+        try
+        {
+            Console.WriteLine($"Performing partial update on user: {userId}...");
+            
+            if (!_identityClient.IsInitialized)
+            {
+                Console.WriteLine("Initializing SDK...");
+                if (!await _identityClient.InitializeAsync())
+                {
+                    Console.WriteLine("❌ Failed to initialize SDK");
+                    return;
+                }
+            }
+
+            var updateSpec = new PartialUpdateSpec
+            {
+                Id = userId,
+                Set = new Dictionary<string, object>(),
+                Remove = removeFields?.ToList()
+            };
+
+            // Add core field updates if provided
+            if (!string.IsNullOrEmpty(newUsername))
+            {
+                updateSpec.Set["username"] = newUsername;
+                Console.WriteLine($"  Setting username to: {newUsername}");
+            }
+
+            if (!string.IsNullOrEmpty(newPassword))
+            {
+                updateSpec.Set["password"] = newPassword; // Will be encrypted by SDK
+                Console.WriteLine("  Setting new password (will be encrypted)");
+            }
+
+            // Parse set fields (format: "field=value")
+            if (setFields != null)
+            {
+                foreach (var setField in setFields)
+                {
+                    var parts = setField.Split('=', 2);
+                    if (parts.Length == 2)
+                    {
+                        var fieldName = parts[0].Trim();
+                        var fieldValue = parts[1].Trim();
+                        
+                        // Try to parse as different types
+                        object parsedValue = fieldValue;
+                        if (int.TryParse(fieldValue, out var intValue))
+                        {
+                            parsedValue = intValue;
+                        }
+                        else if (bool.TryParse(fieldValue, out var boolValue))
+                        {
+                            parsedValue = boolValue;
+                        }
+                        else if (fieldValue.StartsWith("{") && fieldValue.EndsWith("}"))
+                        {
+                            // Try to parse as JSON object
+                            try
+                            {
+                                parsedValue = JsonSerializer.Deserialize<Dictionary<string, object>>(fieldValue);
+                            }
+                            catch
+                            {
+                                // Keep as string if JSON parsing fails
+                            }
+                        }
+
+                        updateSpec.Set[fieldName] = parsedValue!;
+                        Console.WriteLine($"  Setting {fieldName} to: {parsedValue}");
+                    }
+                    else
+                    {
+                        Console.WriteLine($"⚠️  Invalid set field format: {setField} (expected 'field=value')");
+                    }
+                }
+            }
+
+            // Display remove operations
+            if (removeFields != null && removeFields.Length > 0)
+            {
+                Console.WriteLine($"  Removing fields: {string.Join(", ", removeFields)}");
+            }
+
+            var updates = new List<PartialUpdateSpec> { updateSpec };
+            var result = await _identityClient.AdminUpdateUsersPartialAsync(updates);
+            
+            if (result != null)
+            {
+                Console.WriteLine($"✅ Partial update completed successfully! Updated count: {result.Count}");
+            }
+            else
+            {
+                Console.WriteLine("❌ Failed to perform partial update");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ Error performing partial update: {ex.Message}");
+            _logger.LogError(ex, "Partial update users command failed");
         }
     }
 }

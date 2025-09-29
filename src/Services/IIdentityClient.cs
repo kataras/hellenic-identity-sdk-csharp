@@ -233,4 +233,42 @@ public interface IIdentityClient<TUser> where TUser : class
     /// <returns>Count of updated users</returns>
     /// <exception cref="InvalidOperationException">Thrown when client is not initialized or operation fails</exception>
     Task<CountResponse<long>> AdminUpdateUsersAsync(List<TUser> users, params string[] onlyColumns);
+
+    /// <summary>
+    /// Admin operation: Perform partial updates on users (core fields and JSONB attrs)
+    /// Supports updating both core table fields (username, password) and JSONB attrs fields.
+    /// The password field, if present, will be automatically encrypted using the SDK's encryption key.
+    /// </summary>
+    /// <param name="updates">List of partial update specifications</param>
+    /// <returns>Count of updated users</returns>
+    /// <exception cref="InvalidOperationException">Thrown when client is not initialized or operation fails</exception>
+    /// <example>
+    /// Update user fields and nested attributes:
+    /// <code>
+    /// var updates = new List&lt;PartialUpdateSpec&gt;
+    /// {
+    ///     new PartialUpdateSpec
+    ///     {
+    ///         Id = "user-123",
+    ///         Set = new Dictionary&lt;string, object&gt;
+    ///         {
+    ///             ["username"] = "new_username@example.com",
+    ///             ["password"] = "newPlainPassword123", // Will be encrypted automatically
+    ///             ["profile.name"] = "John Doe",
+    ///             ["profile.age"] = 30,
+    ///             ["settings.theme"] = "dark"
+    ///         },
+    ///         Remove = new List&lt;string&gt;
+    ///         {
+    ///             "profile.avatar",
+    ///             "settings.notifications"
+    ///         }
+    ///     }
+    /// };
+    ///
+    /// var result = await client.AdminUpdateUsersPartialAsync(updates);
+    /// Console.WriteLine($"Updated {result.Count} users");
+    /// </code>
+    /// </example>
+    Task<CountResponse<long>> AdminUpdateUsersPartialAsync(List<PartialUpdateSpec> updates);
 }

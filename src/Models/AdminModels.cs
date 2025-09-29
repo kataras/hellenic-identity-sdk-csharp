@@ -175,3 +175,21 @@ public class RequestPasswordResetRequest
     [JsonPropertyName("identifier")]
     public string Identifier { get; set; } = string.Empty;
 }
+
+/// <summary>
+/// Partial update specification for updating users (mirrors Go entity.PartialUpdateSpec)
+/// </summary>
+public class PartialUpdateSpec
+{
+    [JsonPropertyName("id")]
+    public string? Id { get; set; } // User ID for identification
+
+    [JsonPropertyName("username")]
+    public string? Username { get; set; } // Username for identification if ID is not provided
+
+    [JsonPropertyName("set")]
+    public Dictionary<string, object>? Set { get; set; } // Paths to set (e.g., {"profile.name": "John", "profile": {"age": 30}})
+
+    [JsonPropertyName("remove")]
+    public List<string>? Remove { get; set; } // JSON paths to remove (e.g., ["profile.avatar", "settings.notifications"])
+}
