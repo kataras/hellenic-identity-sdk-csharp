@@ -906,6 +906,55 @@ public class IdentityClient<TUser> : IIdentityClient<TUser> where TUser : class
         }
     }
 
+    /// <summary>
+    /// Admin operation: List users with pagination and filtering
+    /// </summary>
+    /// <param name="pageOptions">Pagination options</param>
+    /// <param name="filter">Filter options</param>
+    /// <returns>Paginated list of users</returns>
+    /// <exception cref="InvalidOperationException">Thrown when client is not initialized or operation fails</exception>
+    /// <example>
+    /// Basic usage with pagination:
+    /// <code>
+    /// var pageOptions = new PageOptions
+    /// {
+    ///     Page = 1,
+    ///     Size = 10,
+    ///     Details = false
+    /// };
+    ///
+    /// var result = await client.AdminListUsersAsync(pageOptions);
+    /// </code>
+    ///
+    /// Advanced usage with filtering:
+    /// <code>
+    /// var pageOptions = new PageOptions
+    /// {
+    ///     Page = 1,
+    ///     Size = 10,
+    ///     Details = false
+    /// };
+    ///
+    /// var filterOptions = new UserFilterOptions
+    /// {
+    ///     Sort = "created_at",
+    ///     SortDescending = true,
+    ///     Terms = new List&lt;FilterTerm&gt;
+    ///     {
+    ///         new FilterTerm
+    ///         {
+    ///             Field = "username",
+    ///             Operator = "ILIKE",
+    ///             Value = "%admin%", // Find usernames containing "admin"
+    ///             Logic = "AND"
+    ///         }
+    ///     },
+    ///     IncludeDeleted = false
+    /// };
+    ///
+    /// var result = await client.AdminListUsersAsync(pageOptions, filterOptions);
+    /// </code>
+    /// </example>
     public async Task<PagedResponse<TUser>> AdminListUsersAsync(PageOptions pageOptions, UserFilterOptions? filter = null)
     {
         if (!IsInitialized)
@@ -915,7 +964,8 @@ public class IdentityClient<TUser> : IIdentityClient<TUser> where TUser : class
         
         try
         {
-            _logger.LogDebug("Listing users with page: {Page}, limit: {Limit}", pageOptions.Page, pageOptions.Limit);
+            _logger.LogDebug("Listing users with page: {Page}, size: {Size}, details: {Details}",
+                pageOptions.Page, pageOptions.Size, pageOptions.Details);
             
             var requestBody = filter ?? new UserFilterOptions();
             var requestJson = JsonSerializer.Serialize(requestBody);
@@ -924,17 +974,13 @@ public class IdentityClient<TUser> : IIdentityClient<TUser> where TUser : class
             _httpClient.DefaultRequestHeaders.Clear();
             _httpClient.DefaultRequestHeaders.Add("X-Token", _settings.ClientToken);
             
+            // Build query parameters exactly like Go SDK page.Bind method
             var queryParams = new List<string>
             {
-                $"page={pageOptions.Page}",
-                $"limit={pageOptions.Limit}",
-                $"order={pageOptions.Order}"
+                $"page={GetCurrentPage(pageOptions.Page)}", // Use GetCurrentPage logic from Go
+                $"size={GetLimit(pageOptions.Size)}", // Use GetLimit logic from Go
+                $"details={pageOptions.Details.ToString().ToLower()}" // Boolean to lowercase string
             };
-            
-            if (!string.IsNullOrEmpty(pageOptions.Sort))
-            {
-                queryParams.Add($"sort={pageOptions.Sort}");
-            }
             
             var queryString = string.Join("&", queryParams);
             var url = $"/u/list?{queryString}";
@@ -960,6 +1006,30 @@ public class IdentityClient<TUser> : IIdentityClient<TUser> where TUser : class
             _logger.LogDebug(ex, "ERR: Admin list users failed");
             throw new InvalidOperationException("Admin list users failed", ex);
         }
+    }
+
+    /// <summary>
+    /// Mirror of Go PageOptions.GetCurrentPage() - returns Page or 1
+    /// </summary>
+    private int GetCurrentPage(int page)
+    {
+        return page == 0 ? 1 : page;
+    }
+
+    /// <summary>
+    /// Mirror of Go PageOptions.GetLimit() - returns Size if valid, otherwise DefaultPageSize (100)
+    /// </summary>
+    private int GetLimit(int size)
+    {
+        const int MaxPageSize = 100000;
+        const int DefaultPageSize = 100;
+        
+        if (size > 0 && size < MaxPageSize)
+        {
+            return size;
+        }
+        
+        return DefaultPageSize;
     }
 
     public async Task<CountResponse<long>> AdminUpdateUsersAsync(List<TUser> users, params string[] onlyColumns)

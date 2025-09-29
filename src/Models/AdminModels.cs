@@ -57,24 +57,42 @@ public class UserAttribute
 }
 
 /// <summary>
+/// Filter term for querying users (mirrors Go entity.FilterTerm)
+/// </summary>
+public class FilterTerm
+{
+    [JsonPropertyName("field")]
+    public string Field { get; set; } = string.Empty; // e.g. "username", "email", "attrs->>'phone'"
+
+    [JsonPropertyName("operator")]
+    public string Operator { get; set; } = "="; // e.g. "=", "ILIKE", "@>", etc.
+
+    [JsonPropertyName("value")]
+    public object? Value { get; set; } // e.g. "makis", "%gmail%", JSON...
+
+    [JsonPropertyName("logic")]
+    public string Logic { get; set; } = "AND"; // e.g. "AND", "OR"
+}
+
+/// <summary>
 /// User filter options for listing users (mirrors Go entity.UserFilterOptions)
 /// </summary>
 public class UserFilterOptions
 {
-    [JsonPropertyName("username")]
-    public string? Username { get; set; }
+    [JsonPropertyName("sort")]
+    public string? Sort { get; set; } // Optional. Sort expression.
 
-    [JsonPropertyName("role")]
-    public int? Role { get; set; }
+    [JsonPropertyName("sort_descending")]
+    public bool SortDescending { get; set; } // Optional. Sort in descending order.
 
-    [JsonPropertyName("deleted")]
-    public bool? Deleted { get; set; }
+    [JsonPropertyName("terms")]
+    public List<FilterTerm>? Terms { get; set; } // Filter terms
 
-    [JsonPropertyName("created_at_from")]
-    public DateTime? CreatedAtFrom { get; set; }
+    [JsonPropertyName("include_deleted")]
+    public bool IncludeDeleted { get; set; } // Optional. Include soft-deleted users.
 
-    [JsonPropertyName("created_at_to")]
-    public DateTime? CreatedAtTo { get; set; }
+    [JsonPropertyName("include_ids")]
+    public List<string>? IncludeIds { get; set; } // Optional. List of user IDs to include.
 }
 
 /// <summary>
@@ -83,16 +101,13 @@ public class UserFilterOptions
 public class PageOptions
 {
     [JsonPropertyName("page")]
-    public int Page { get; set; } = 1;
+    public int Page { get; set; } = 1; // Current page number
 
-    [JsonPropertyName("limit")]
-    public int Limit { get; set; } = 20;
+    [JsonPropertyName("size")]
+    public int Size { get; set; } = 100; // Elements to get (called Size in Go, not Limit)
 
-    [JsonPropertyName("sort")]
-    public string? Sort { get; set; }
-
-    [JsonPropertyName("order")]
-    public string Order { get; set; } = "desc";
+    [JsonPropertyName("details")]
+    public bool Details { get; set; } // Return nested objects or not
 }
 
 /// <summary>
@@ -100,20 +115,26 @@ public class PageOptions
 /// </summary>
 public class PagedResponse<T>
 {
-    [JsonPropertyName("data")]
-    public List<T> Data { get; set; } = new();
+    [JsonPropertyName("current_page")]
+    public int CurrentPage { get; set; } // The current page
 
-    [JsonPropertyName("total")]
-    public long Total { get; set; }
+    [JsonPropertyName("page_size")]
+    public int PageSize { get; set; } // The total amount of entities returned
 
-    [JsonPropertyName("page")]
-    public int Page { get; set; }
+    [JsonPropertyName("total_pages")]
+    public int TotalPages { get; set; } // Total number of pages based on page, size and total count
 
-    [JsonPropertyName("limit")]
-    public int Limit { get; set; }
+    [JsonPropertyName("total_items")]
+    public long TotalItems { get; set; } // Total number of rows
 
-    [JsonPropertyName("pages")]
-    public int Pages { get; set; }
+    [JsonPropertyName("has_next_page")]
+    public bool HasNextPage { get; set; } // True if more data can be fetched
+
+    [JsonPropertyName("filter")]
+    public object? Filter { get; set; } // Any filter data
+
+    [JsonPropertyName("items")]
+    public List<T> Items { get; set; } = new(); // Items array
 }
 
 /// <summary>

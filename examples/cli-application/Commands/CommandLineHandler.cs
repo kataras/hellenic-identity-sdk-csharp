@@ -715,7 +715,7 @@ public class CommandLineHandler
     {
         try
         {
-            Console.WriteLine($"Listing users (page: {page}, limit: {limit})...");
+            Console.WriteLine($"Listing users (page: {page}, size: {limit})...");
             
             if (!_identityClient.IsInitialized)
             {
@@ -730,27 +730,51 @@ public class CommandLineHandler
             var pageOptions = new PageOptions
             {
                 Page = page,
-                Limit = limit,
-                Sort = sort,
-                Order = order
+                Size = limit,  // Changed from Limit to Size
+                Details = false
             };
 
-            var filter = new UserFilterOptions();
+            var filter = new UserFilterOptions
+            {
+                Sort = sort,
+                SortDescending = order?.ToLower() == "desc",
+                Terms = new List<FilterTerm>(),
+                IncludeDeleted = deletedFilter ?? false
+            };
+
+            // Add username filter if provided
             if (!string.IsNullOrEmpty(usernameFilter))
-                filter.Username = usernameFilter;
+            {
+                filter.Terms.Add(new FilterTerm
+                {
+                    Field = "username",
+                    Operator = "ILIKE",
+                    Value = $"%{usernameFilter}%",
+                    Logic = "AND"
+                });
+            }
+
+            // Add role filter if provided
             if (roleFilter.HasValue)
-                filter.Role = roleFilter.Value;
-            if (deletedFilter.HasValue)
-                filter.Deleted = deletedFilter.Value;
+            {
+                filter.Terms.Add(new FilterTerm
+                {
+                    Field = "role", // Will be converted to attrs->>'role'
+                    Operator = "=",
+                    Value = roleFilter.Value,
+                    Logic = "AND"
+                });
+            }
 
             var result = await _identityClient.AdminListUsersAsync(pageOptions, filter);
             
             if (result != null)
             {
                 Console.WriteLine("✅ Users listed successfully using generic SDK!");
-                Console.WriteLine($"\nTotal: {result.Total}, Page: {result.Page}/{result.Pages}, Showing: {result.Data.Count}");
+                Console.WriteLine($"\nTotal: {result.TotalItems}, Page: {result.CurrentPage}/{result.TotalPages}, Showing: {result.Items.Count}");
+                Console.WriteLine($"Has Next Page: {result.HasNextPage}");
                 Console.WriteLine("\nUsers:");
-                var json = JsonSerializer.Serialize(result.Data, new JsonSerializerOptions { WriteIndented = true });
+                var json = JsonSerializer.Serialize(result.Items, new JsonSerializerOptions { WriteIndented = true });
                 Console.WriteLine(json);
             }
             else

@@ -181,6 +181,48 @@ public interface IIdentityClient<TUser> where TUser : class
     /// <param name="filter">Filter options</param>
     /// <returns>Paginated list of users</returns>
     /// <exception cref="InvalidOperationException">Thrown when client is not initialized or operation fails</exception>
+    /// <example>
+    /// Basic usage with pagination:
+    /// <code>
+    /// var pageOptions = new PageOptions
+    /// {
+    ///     Page = 1,
+    ///     Size = 10,
+    ///     Details = false
+    /// };
+    ///
+    /// var result = await client.AdminListUsersAsync(pageOptions);
+    /// </code>
+    ///
+    /// Advanced usage with filtering:
+    /// <code>
+    /// var pageOptions = new PageOptions
+    /// {
+    ///     Page = 1,
+    ///     Size = 10,
+    ///     Details = false
+    /// };
+    ///
+    /// var filterOptions = new UserFilterOptions
+    /// {
+    ///     Sort = "created_at",
+    ///     SortDescending = true,
+    ///     Terms = new List&lt;FilterTerm&gt;
+    ///     {
+    ///         new FilterTerm
+    ///         {
+    ///             Field = "username",
+    ///             Operator = "ILIKE",
+    ///             Value = "%admin%", // Find usernames containing "admin"
+    ///             Logic = "AND"
+    ///         }
+    ///     },
+    ///     IncludeDeleted = false
+    /// };
+    ///
+    /// var result = await client.AdminListUsersAsync(pageOptions, filterOptions);
+    /// </code>
+    /// </example>
     Task<PagedResponse<TUser>> AdminListUsersAsync(PageOptions pageOptions, UserFilterOptions? filter = null);
 
     /// <summary>
