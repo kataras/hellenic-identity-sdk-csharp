@@ -754,19 +754,19 @@ public class IdentityClient<TUser> : IIdentityClient<TUser> where TUser : class
         {
             _logger.LogDebug("Deleting user: {Identifier} (soft: {Soft})", request.Identifier, request.Soft);
             
-            var queryParams = new List<string> { $"identifier={Uri.EscapeDataString(request.Identifier)}" };
-            if (request.Soft.HasValue && request.Soft.Value)
-            {
-                queryParams.Add("soft=true");
-            }
-            
-            var queryString = string.Join("&", queryParams);
-            var url = $"/u?{queryString}";
+            var requestJson = JsonSerializer.Serialize(request);
+            _logger.LogDebug("Admin delete user request body: {RequestBody}", requestJson);
             
             _httpClient.DefaultRequestHeaders.Clear();
             _httpClient.DefaultRequestHeaders.Add("X-Token", _settings.ClientToken);
             
-            var response = await _httpClient.DeleteAsync(url);
+            // DELETE with body requires HttpRequestMessage (mirrors Go SDK approach)
+            var httpRequest = new HttpRequestMessage(HttpMethod.Delete, "/u")
+            {
+                Content = new StringContent(requestJson, Encoding.UTF8, "application/json")
+            };
+            
+            var response = await _httpClient.SendAsync(httpRequest);
             
             if (response.StatusCode == System.Net.HttpStatusCode.NoContent)
             {

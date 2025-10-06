@@ -7,7 +7,7 @@
     
     <!-- Package metadata for NuGet publishing -->
     <PackageId>Hellenic.Identity.SDK</PackageId>
-    <Version>1.0.15</Version>
+    <Version>1.0.16</Version>
     <Authors>Gerasimos Maropoulos</Authors>
     <Description>Hellenic Identity SDK for JWT authentication and user management with EdDSA/Ed25519 support, ASP.NET Core authentication handler, and generic user model structure</Description>
     <PackageTags>jwt;authentication;identity;sdk;generic;hellenic;eddsa;ed25519;aspnetcore;bearer</PackageTags>
