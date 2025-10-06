@@ -787,6 +787,82 @@ public class IdentityClient<TUser> : IIdentityClient<TUser> where TUser : class
         }
     }
 
+    /// <summary>
+    /// Admin operation: Bulk delete multiple users by IDs
+    /// </summary>
+    /// <param name="request">Bulk delete request containing user IDs and soft delete flag</param>
+    /// <returns>Count of deleted users</returns>
+    /// <exception cref="InvalidOperationException">Thrown when client is not initialized or operation fails</exception>
+    /// <example>
+    /// Bulk delete users (soft delete):
+    /// <code>
+    /// var request = new BulkUserDeleteRequest
+    /// {
+    ///     Ids = new List&lt;string&gt; { "user-id-1", "user-id-2", "user-id-3" },
+    ///     Soft = true // Mark as deleted without removing from database
+    /// };
+    ///
+    /// var deletedCount = await client.AdminBulkDeleteUsersAsync(request);
+    /// Console.WriteLine($"Deleted {deletedCount} users");
+    /// </code>
+    ///
+    /// Bulk delete users (hard delete):
+    /// <code>
+    /// var request = new BulkUserDeleteRequest
+    /// {
+    ///     Ids = new List&lt;string&gt; { "user-id-1", "user-id-2", "user-id-3" },
+    ///     Soft = false // Permanently delete from database
+    /// };
+    ///
+    /// var deletedCount = await client.AdminBulkDeleteUsersAsync(request);
+    /// Console.WriteLine($"Permanently deleted {deletedCount} users");
+    /// </code>
+    /// </example>
+    public async Task<long> AdminBulkDeleteUsersAsync(BulkUserDeleteRequest request)
+    {
+        if (!IsInitialized)
+        {
+            throw new InvalidOperationException("Client not initialized");
+        }
+        
+        try
+        {
+            _logger.LogDebug("Bulk deleting {UserCount} users (soft: {Soft})", request.Ids.Count, request.Soft);
+            
+            var requestJson = JsonSerializer.Serialize(request);
+            _logger.LogDebug("Admin bulk delete users request body: {RequestBody}", requestJson);
+            
+            _httpClient.DefaultRequestHeaders.Clear();
+            _httpClient.DefaultRequestHeaders.Add("X-Token", _settings.ClientToken);
+            
+            var httpRequest = new HttpRequestMessage(HttpMethod.Delete, "/u/bulk")
+            {
+                Content = new StringContent(requestJson, Encoding.UTF8, "application/json")
+            };
+            
+            var response = await _httpClient.SendAsync(httpRequest);
+            
+            if (response.IsSuccessStatusCode)
+            {
+                var json = await response.Content.ReadAsStringAsync();
+                var countResponse = JsonSerializer.Deserialize<CountResponse<long>>(json);
+                _logger.LogDebug("Bulk deleted {Count} users successfully", countResponse?.Count ?? 0);
+                return countResponse?.Count ?? 0;
+            }
+            
+            // Read and log the error response body for better debugging
+            var errorContent = await response.Content.ReadAsStringAsync();
+            _logger.LogDebug("ERR: Bulk delete users failed: {StatusCode} - Response: {ErrorContent}",
+                response.StatusCode, errorContent);
+            throw new InvalidOperationException($"Bulk delete users failed with status {response.StatusCode}: {errorContent}");
+        }
+        catch (Exception ex) when (!(ex is InvalidOperationException))
+        {
+            _logger.LogDebug(ex, "ERR: Admin bulk delete users failed");
+            throw new InvalidOperationException("Admin bulk delete users failed", ex);
+        }
+    }
+
     public async Task<bool> AdminRestoreUserAsync(AdminRestoreUserRequest request)
     {
         if (!IsInitialized)

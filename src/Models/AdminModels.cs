@@ -193,3 +193,15 @@ public class PartialUpdateSpec
     [JsonPropertyName("remove")]
     public List<string>? Remove { get; set; } // JSON paths to remove (e.g., ["profile.avatar", "settings.notifications"])
 }
+
+/// <summary>
+/// Bulk delete users request (mirrors Go BulkUserDeleteRequest)
+/// </summary>
+public class BulkUserDeleteRequest
+{
+    [JsonPropertyName("ids")]
+    public List<string> Ids { get; set; } = new(); // IDs of the users to delete
+
+    [JsonPropertyName("soft")]
+    public bool? Soft { get; set; } // When true, users are marked as deleted but not actually removed
+}

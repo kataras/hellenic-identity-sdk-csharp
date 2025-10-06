@@ -36,6 +36,7 @@ public class CommandLineHandler
         // Add admin commands
         rootCommand.AddCommand(CreateAdminGetSchemaCommand());
         rootCommand.AddCommand(CreateAdminDeleteUserCommand());
+        rootCommand.AddCommand(CreateAdminDeleteUsersCommand());
         rootCommand.AddCommand(CreateAdminRestoreUserCommand());
         rootCommand.AddCommand(CreateAdminResetPasswordCommand());
         rootCommand.AddCommand(CreateAdminListUsersCommand());
@@ -208,6 +209,30 @@ public class CommandLineHandler
         {
             await HandleAdminDeleteUserAsync(identifier, soft);
         }, identifierOption, softOption);
+
+        return command;
+    }
+
+    private Command CreateAdminDeleteUsersCommand()
+    {
+        var command = new Command("admin-delete-users", "Bulk delete multiple users by IDs (requires admin client token)");
+        
+        var idsOption = new Option<string[]>(
+            name: "--ids",
+            description: "User IDs to delete (comma-separated)")
+        { IsRequired = true, AllowMultipleArgumentsPerToken = true };
+        
+        var softOption = new Option<bool>(
+            name: "--soft",
+            description: "Perform soft delete (mark as deleted but keep in database)");
+
+        command.AddOption(idsOption);
+        command.AddOption(softOption);
+
+        command.SetHandler(async (string[] ids, bool soft) =>
+        {
+            await HandleAdminBulkDeleteUsersAsync(ids, soft);
+        }, idsOption, softOption);
 
         return command;
     }
@@ -670,6 +695,48 @@ public class CommandLineHandler
         {
             Console.WriteLine($"❌ Error deleting user: {ex.Message}");
             _logger.LogError(ex, "Delete user command failed");
+        }
+    }
+
+    private async Task HandleAdminBulkDeleteUsersAsync(string[] ids, bool soft)
+    {
+        try
+        {
+            Console.WriteLine($"Bulk deleting {ids.Length} users (soft: {soft})...");
+            
+            if (!_identityClient.IsInitialized)
+            {
+                Console.WriteLine("Initializing SDK...");
+                if (!await _identityClient.InitializeAsync())
+                {
+                    Console.WriteLine("❌ Failed to initialize SDK");
+                    return;
+                }
+            }
+
+            var request = new BulkUserDeleteRequest
+            {
+                Ids = ids.ToList(),
+                Soft = soft ? soft : null
+            };
+
+            Console.WriteLine($"User IDs to delete: {string.Join(", ", ids)}");
+
+            var deletedCount = await _identityClient.AdminBulkDeleteUsersAsync(request);
+            
+            if (deletedCount > 0)
+            {
+                Console.WriteLine($"✅ Successfully deleted {deletedCount} user(s)!");
+            }
+            else
+            {
+                Console.WriteLine("❌ No users were deleted");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ Error bulk deleting users: {ex.Message}");
+            _logger.LogError(ex, "Bulk delete users command failed");
         }
     }
 

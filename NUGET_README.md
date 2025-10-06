@@ -26,10 +26,10 @@ dotnet build --configuration Release
 ```bash
 # Create package manually
 dotnet pack src/Hellenic.Identity.SDK.csproj --configuration Release --output ./nupkg
-# dotnet nuget push ./nupkg/Hellenic.Identity.SDK.1.0.14.nupkg --api-key YOUR-API-KEY --source https://api.nuget.org/v3/index.json
+# dotnet nuget push ./nupkg/Hellenic.Identity.SDK.1.0.15.nupkg --api-key YOUR-API-KEY --source https://api.nuget.org/v3/index.json
 
 # Create package with specific version
-dotnet pack src/Hellenic.Identity.SDK.csproj --configuration Release --output ./nupkg -p:PackageVersion=1.0.14
+dotnet pack src/Hellenic.Identity.SDK.csproj --configuration Release --output ./nupkg -p:PackageVersion=1.0.15
 ```
 
 ### 3. Clean Build
@@ -48,7 +48,7 @@ The package metadata is configured in [`src/Hellenic.Identity.SDK.csproj`](../sr
 <PropertyGroup>
     <!-- Package metadata for NuGet publishing -->
     <PackageId>Hellenic.Identity.SDK</PackageId>
-    <Version>1.0.14</Version>
+    <Version>1.0.15</Version>
     <Authors>Gerasimos Maropoulos</Authors>
     <Description>Hellenic Identity SDK for JWT authentication and user management with EdDSA/Ed25519 support and generic user model structure</Description>
     <PackageTags>jwt;authentication;identity;sdk;generic;hellenic;eddsa;ed25519</PackageTags>
@@ -104,10 +104,10 @@ dotnet nuget setapikey YOUR_API_KEY_HERE --source https://api.nuget.org/v3/index
 
 ```bash
 # Publish latest package in nupkg folder
-dotnet nuget push ./nupkg/Hellenic.Identity.SDK.1.0.14.nupkg --source https://api.nuget.org/v3/index.json
+dotnet nuget push ./nupkg/Hellenic.Identity.SDK.1.0.15.nupkg --source https://api.nuget.org/v3/index.json
 
 # Publish with specific API key
-dotnet nuget push ./nupkg/Hellenic.Identity.SDK.1.0.14.nupkg --api-key YOUR_API_KEY --source https://api.nuget.org/v3/index.json
+dotnet nuget push ./nupkg/Hellenic.Identity.SDK.1.0.15.nupkg --api-key YOUR_API_KEY --source https://api.nuget.org/v3/index.json
 ```
 
 ### 4. Verify Publication
@@ -130,7 +130,7 @@ dotnet nuget add source C:\LocalNuGetFeed --name Local
 
 ```bash
 # Copy package to local feed
-copy ./nupkg/Hellenic.Identity.SDK.1.0.14.nupkg C:\LocalNuGetFeed\
+copy ./nupkg/Hellenic.Identity.SDK.1.0.15.nupkg C:\LocalNuGetFeed\
 ```
 
 ### 3. Test Local Package
@@ -193,13 +193,13 @@ dotnet nuget push ./nupkg/Hellenic.Identity.SDK.1.0.1.nupkg --source https://api
 dotnet tool install -g NuGetPackageExplorer
 
 # Or use command line to list contents
-7z l ./nupkg/Hellenic.Identity.SDK.1.0.14.nupkg
+7z l ./nupkg/Hellenic.Identity.SDK.1.0.15.nupkg
 ```
 
 ### Expected Package Structure
 
 ```
-Hellenic.Identity.SDK.1.0.14.nupkg
+Hellenic.Identity.SDK.1.0.15.nupkg
 ├── lib/
 │   └── net9.0/
 │       ├── Hellenic.Identity.SDK.dll
@@ -245,7 +245,7 @@ dotnet nuget locals all --clear
 
 ```bash
 # Validate package before publishing
-dotnet nuget verify ./nupkg/Hellenic.Identity.SDK.1.0.14.nupkg
+dotnet nuget verify ./nupkg/Hellenic.Identity.SDK.1.0.15.nupkg
 ```
 
 ## Best Practices

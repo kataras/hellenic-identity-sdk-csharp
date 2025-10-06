@@ -159,6 +159,39 @@ public interface IIdentityClient<TUser> where TUser : class
     Task<bool> AdminDeleteUserAsync(AdminDeleteUserRequest request);
 
     /// <summary>
+    /// Admin operation: Bulk delete multiple users by IDs
+    /// </summary>
+    /// <param name="request">Bulk delete request containing user IDs and soft delete flag</param>
+    /// <returns>Count of deleted users</returns>
+    /// <exception cref="InvalidOperationException">Thrown when client is not initialized or operation fails</exception>
+    /// <example>
+    /// Bulk delete users (soft delete):
+    /// <code>
+    /// var request = new BulkUserDeleteRequest
+    /// {
+    ///     Ids = new List&lt;string&gt; { "user-id-1", "user-id-2", "user-id-3" },
+    ///     Soft = true // Mark as deleted without removing from database
+    /// };
+    ///
+    /// var deletedCount = await client.AdminBulkDeleteUsersAsync(request);
+    /// Console.WriteLine($"Deleted {deletedCount} users");
+    /// </code>
+    ///
+    /// Bulk delete users (hard delete):
+    /// <code>
+    /// var request = new BulkUserDeleteRequest
+    /// {
+    ///     Ids = new List&lt;string&gt; { "user-id-1", "user-id-2", "user-id-3" },
+    ///     Soft = false // Permanently delete from database
+    /// };
+    ///
+    /// var deletedCount = await client.AdminBulkDeleteUsersAsync(request);
+    /// Console.WriteLine($"Permanently deleted {deletedCount} users");
+    /// </code>
+    /// </example>
+    Task<long> AdminBulkDeleteUsersAsync(BulkUserDeleteRequest request);
+
+    /// <summary>
     /// Admin operation: Restore a deleted user by ID or username
     /// </summary>
     /// <param name="request">Restore user request</param>
