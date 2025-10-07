@@ -16,7 +16,8 @@ namespace Hellenic.Identity.SDK.Services;
 
 /// <summary>
 /// Generic Identity Client implementation that mirrors the Go SDK functionality
-/// TUser allows any user model structure
+/// TUser allows any user model structure, it should not contain a password field
+/// since passwords are handled separately and encrypted before transmission.
 /// </summary>
 public class IdentityClient<TUser> : IIdentityClient<TUser> where TUser : class
 {
@@ -402,6 +403,109 @@ public class IdentityClient<TUser> : IIdentityClient<TUser> where TUser : class
         {
             _logger.LogDebug(ex, "ERR: Admin user signup failed");
             throw new InvalidOperationException("Admin user signup failed", ex);
+        }
+    }
+
+    /// <summary>
+    /// Admin operation: Bulk insert multiple users with their plain passwords
+    /// Mirrors Go SDK's AdminBulkInsertUsers method
+    /// </summary>
+    /// <param name="users">List of users to insert</param>
+    /// <param name="plainPasswords">List of plain text passwords corresponding to each user</param>
+    /// <returns>Bulk insert response with total provided and inserted counts</returns>
+    /// <exception cref="InvalidOperationException">Thrown when client is not initialized or operation fails</exception>
+    /// <exception cref="ArgumentException">Thrown when users and passwords count mismatch or validation fails</exception>
+    public async Task<BulkInsertUsersResponse> AdminBulkInsertUsersAsync(List<TUser> users, List<string> plainPasswords)
+    {
+        if (!IsInitialized)
+        {
+            throw new InvalidOperationException("Client not initialized");
+        }
+
+        // Validate users and passwords count match (mirrors Go SDK line 223-225)
+        if (users.Count != plainPasswords.Count)
+        {
+            throw new ArgumentException("The number of users and passwords must be the same");
+        }
+
+        try
+        {
+            _logger.LogDebug("Bulk inserting {UserCount} users", users.Count);
+
+            // Process each user and encrypt their password (mirrors Go SDK lines 227-250)
+            var requestList = new List<Dictionary<string, object>>();
+
+            for (int i = 0; i < users.Count; i++)
+            {
+                var user = users[i];
+                var plainPassword = plainPasswords[i];
+
+                // Validate password strength (mirrors Go SDK lines 229-231)
+                try
+                {
+                    ValidatePassword(plainPassword);
+                }
+                catch (ArgumentException ex)
+                {
+                    throw new ArgumentException($"Password validation failed for user at index {i}: {ex.Message}", ex);
+                }
+
+                // Encrypt the password (mirrors Go SDK lines 233-236)
+                string encryptedPassword;
+                try
+                {
+                    encryptedPassword = EncryptPassword(plainPassword);
+                }
+                catch (Exception ex)
+                {
+                    throw new InvalidOperationException($"Failed to encrypt password for user at index {i}: {ex.Message}", ex);
+                }
+
+                // Marshal user to bytes and convert to map (mirrors Go SDK lines 238-246)
+                var userJson = JsonSerializer.Serialize(user);
+                var userMap = JsonSerializer.Deserialize<Dictionary<string, object>>(userJson);
+
+                if (userMap == null)
+                {
+                    throw new InvalidOperationException($"Failed to unmarshal user bytes to map at index {i}");
+                }
+
+                // Add encrypted password to user map (mirrors Go SDK line 248)
+                userMap["password"] = encryptedPassword;
+
+                requestList.Add(userMap);
+            }
+
+            // Serialize the request list
+            var requestJson = JsonSerializer.Serialize(requestList);
+            _logger.LogDebug("Admin bulk insert users request body: {RequestBody}", requestJson);
+
+            _httpClient.DefaultRequestHeaders.Clear();
+            _httpClient.DefaultRequestHeaders.Add("X-Token", _settings.ClientToken);
+
+            // Fire POST request to /u/bulk endpoint (mirrors Go SDK line 253)
+            var response = await _httpClient.PostAsync("/u/bulk",
+                new StringContent(requestJson, Encoding.UTF8, "application/json"));
+
+            if (response.IsSuccessStatusCode)
+            {
+                var json = await response.Content.ReadAsStringAsync();
+                var bulkResponse = JsonSerializer.Deserialize<BulkInsertUsersResponse>(json);
+                _logger.LogDebug("Bulk inserted {TotalInserted} out of {TotalProvided} users successfully",
+                    bulkResponse?.TotalInserted ?? 0, bulkResponse?.TotalProvided ?? 0);
+                return bulkResponse ?? throw new InvalidOperationException("Failed to deserialize bulk insert response");
+            }
+
+            // Read and log the error response body for better debugging
+            var errorContent = await response.Content.ReadAsStringAsync();
+            _logger.LogDebug("ERR: Bulk insert users failed: {StatusCode} - Response: {ErrorContent}",
+                response.StatusCode, errorContent);
+            throw new InvalidOperationException($"Bulk insert users failed with status {response.StatusCode}: {errorContent}");
+        }
+        catch (Exception ex) when (!(ex is InvalidOperationException || ex is ArgumentException))
+        {
+            _logger.LogDebug(ex, "ERR: Admin bulk insert users failed");
+            throw new InvalidOperationException("Admin bulk insert users failed", ex);
         }
     }
 

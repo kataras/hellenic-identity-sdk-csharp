@@ -87,6 +87,38 @@ public interface IIdentityClient<TUser> where TUser : class
     Task<TokenResponse> AdminUserSignupAsync(TUser user, string password);
 
     /// <summary>
+    /// Admin operation: Bulk insert multiple users with their plain passwords (requires admin client token)
+    /// </summary>
+    /// <param name="users">List of users to insert</param>
+    /// <param name="plainPasswords">List of plain text passwords corresponding to each user</param>
+    /// <returns>Bulk insert response with total provided and inserted counts</returns>
+    /// <exception cref="InvalidOperationException">Thrown when client is not initialized or operation fails</exception>
+    /// <exception cref="ArgumentException">Thrown when users and passwords count mismatch</exception>
+    /// <example>
+    /// Bulk insert users:
+    /// <code>
+    /// var users = new List&lt;UserModel&gt;
+    /// {
+    ///     new UserModel { Username = "user1@example.com" },
+    ///     new UserModel { Username = "user2@example.com" },
+    ///     new UserModel { Username = "user3@example.com" }
+    /// };
+    ///
+    /// var passwords = new List&lt;string&gt;
+    /// {
+    ///     "password123",
+    ///     "password456",
+    ///     "password789"
+    /// };
+    ///
+    /// var response = await client.AdminBulkInsertUsersAsync(users, passwords);
+    /// Console.WriteLine($"Inserted {response.TotalInserted} out of {response.TotalProvided} users");
+    /// Console.WriteLine($"Message: {response.Message}");
+    /// </code>
+    /// </example>
+    Task<BulkInsertUsersResponse> AdminBulkInsertUsersAsync(List<TUser> users, List<string> plainPasswords);
+
+    /// <summary>
     /// Sign in a user using OAuth2 password grant
     /// </summary>
     /// <param name="username">Username or email</param>

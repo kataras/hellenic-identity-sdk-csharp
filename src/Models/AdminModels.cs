@@ -205,3 +205,18 @@ public class BulkUserDeleteRequest
     [JsonPropertyName("soft")]
     public bool? Soft { get; set; } // When true, users are marked as deleted but not actually removed
 }
+
+/// <summary>
+/// Bulk insert users response (mirrors Go identity.BulkInsertUsersResponse)
+/// </summary>
+public class BulkInsertUsersResponse
+{
+    [JsonPropertyName("total_provided")]
+    public long TotalProvided { get; set; }
+
+    [JsonPropertyName("total_inserted")]
+    public long TotalInserted { get; set; }
+
+    [JsonPropertyName("message")]
+    public string Message { get; set; } = string.Empty;
+}
